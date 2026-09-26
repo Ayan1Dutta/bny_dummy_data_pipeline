@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+data/warehouse/*.duckdb
+data/warehouse/*.wal
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+evidence/
+deploy/env/
+deploy/state.json
+deploy/logs/
+.ruff_cache/

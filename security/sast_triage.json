@@ -1,0 +1,25 @@
+{
+  "policy": "HIGH severity always blocks. MEDIUM blocks unless triaged here with a matching file, rule and maximum count. Any B608 in src/api/ always blocks because that layer receives user input.",
+  "reviewed_by": "Payments Data Engineering",
+  "reviewed_on": "2026-09-25",
+  "findings": [
+    {
+      "file": "src/ingestion/bronze.py",
+      "rule": "B608",
+      "max_count": 2,
+      "justification": "Table name comes from the ENTITIES dictionary in source control and the column list from the same dictionary. The file path is bound as a parameter. No request or file content reaches the SQL text."
+    },
+    {
+      "file": "src/transform/silver.py",
+      "rule": "B608",
+      "max_count": 12,
+      "justification": "Predicates are composed from src/quality/rules.py, a reviewed rule catalogue in source control. Temp table and schema names are constants. Watermarks and batch ids are bound parameters."
+    },
+    {
+      "file": "src/transform/gold.py",
+      "rule": "B608",
+      "max_count": 3,
+      "justification": "Only the MERCHANT_KEY and CUSTOMER_KEY surrogate-key expressions (module constants) are interpolated. Batch ids and watermarks are bound parameters."
+    }
+  ]
+}

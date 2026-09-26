@@ -1,0 +1,44 @@
+name: settlement-bg
+
+x-api: &api
+  pull_policy: never
+  restart: unless-stopped
+  environment:
+    APP_ENV: ${APP_ENV:-dev}
+    API_KEY: ${API_KEY:-dev-local-key-change-me}
+    PII_SALT: ${PII_SALT:-dev-salt-change-me}
+    CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+  volumes:
+    - warehouse:/app/data/warehouse
+
+services:
+  api-blue:
+    <<: *api
+    image: settlement-api:${BLUE_TAG:-v1}
+    env_file: deploy/env/blue.env
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8001:8000"
+
+  api-green:
+    <<: *api
+    image: settlement-api:${GREEN_TAG:-v2}
+    env_file: deploy/env/green.env
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8002:8000"
+
+  lb:
+    build:
+      context: deploy/nginx
+      args:
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    image: settlement-lb:local
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:8000:80"
+    volumes:
+      - lb-config:/etc/nginx/bluegreen
+
+volumes:
+  warehouse:
+  lb-config:

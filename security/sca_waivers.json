@@ -1,0 +1,4 @@
+{
+  "policy": "CRITICAL, HIGH and UNKNOWN severity findings in runtime dependencies block production. MEDIUM and LOW are reported and must be remediated within 30 days. A waiver needs a reason, an approver and an expiry date; expired waivers stop applying automatically.",
+  "waivers": []
+}

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settlement control — Payments Operations</title>
+<style>
+:root{
+  --page:#E9EDF0;
+  --surface:#FFFFFF;
+  --ink:#0F2A3F;
+  --ink-soft:#4A6275;
+  --line:#CBD5DC;
+  --settled:#1F7A5C;
+  --gap:#A8322D;
+  --warn:#B07A12;
+  --rule:#8FA3B0;
+  --focus:#1F5C8C;
+  font-synthesis-weight:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--page);
+  color:var(--ink);
+  font-family:"Segoe UI",Roboto,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px;
+  line-height:1.45;
+  font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 64px}
+header.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:14px}
+h1{font-size:23px;font-weight:650;margin:0;letter-spacing:-0.01em}
+.sub{color:var(--ink-soft);font-size:13.5px;margin-top:3px}
+form.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:4px}
+input,select,button{font:inherit;color:var(--ink);border:1px solid var(--line);background:var(--surface);border-radius:3px;padding:7px 9px}
+input[type=date]{min-width:150px}
+button{background:var(--ink);color:#fff;border-color:var(--ink);cursor:pointer;padding:8px 16px}
+button:hover{background:#163D58}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+section{margin-top:26px}
+h2{font-size:14px;font-weight:650;margin:0 0 10px;color:var(--ink)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:18px}
+
+.flow{display:grid;grid-template-columns:1fr;gap:14px}
+.flow .headline{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
+.flow .amount{font-size:40px;font-weight:660;letter-spacing:-0.02em;line-height:1}
+.flow .amount.gap{color:var(--gap)}
+.flow .caption{color:var(--ink-soft);font-size:13.5px;max-width:60ch}
+.bar{height:34px;width:100%;background:#DFE5EA;border-radius:2px;overflow:hidden;display:flex}
+.bar .settled{background:var(--settled)}
+.bar .missing{background:repeating-linear-gradient(135deg,#C9564F,#C9564F 6px,#B8443E 6px,#B8443E 12px)}
+.legend{display:flex;flex-wrap:wrap;gap:20px;font-size:13px;color:var(--ink-soft)}
+.legend b{color:var(--ink);font-weight:600}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px}
+.kpi .k{font-size:12px;color:var(--ink-soft)}
+.kpi .v{font-size:25px;font-weight:640;margin-top:4px;letter-spacing:-0.01em}
+.kpi .n{font-size:12px;color:var(--ink-soft);margin-top:2px}
+.kpi.breach .v{color:var(--gap)}
+.kpi.good .v{color:var(--settled)}
+
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:860px){.charts{grid-template-columns:1fr}}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.axis{stroke:var(--rule);stroke-width:1}
+.gridline{stroke:#E4E9ED;stroke-width:1}
+.tick{fill:var(--ink-soft);font-size:11px}
+.bar-txn{fill:#9FB4C2}
+.bar-stl{fill:var(--settled)}
+.bar-gapm{fill:var(--gap)}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--ink-soft);font-weight:600}
+td.num,th.num{text-align:right}
+.mid{font-family:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;font-size:13px}
+.risk{display:inline-block;padding:1px 7px;border-radius:2px;font-size:12px;border:1px solid}
+.risk.HIGH{color:var(--gap);border-color:#E2B5B2;background:#FBEFEE}
+.risk.MEDIUM{color:var(--warn);border-color:#E6D2A8;background:#FBF6EA}
+.risk.LOW{color:var(--settled);border-color:#B8D6C9;background:#EFF7F3}
+.risk.UNKNOWN{color:var(--ink-soft);border-color:var(--line);background:#F2F5F7}
+.breachval{color:var(--gap);font-weight:600}
+.minibar{display:inline-block;height:8px;background:var(--gap);border-radius:1px;vertical-align:middle;margin-left:8px}
+
+.note{font-size:13px;color:var(--ink-soft);margin-top:10px}
+.state{padding:22px;text-align:center;color:var(--ink-soft);border:1px dashed var(--line);border-radius:4px;background:var(--surface)}
+.state.error{color:var(--gap);border-color:#E2B5B2;background:#FBEFEE;text-align:left}
+.state.error b{display:block;margin-bottom:4px;color:var(--gap)}
+.hidden{display:none}
+@media(prefers-reduced-motion:no-preference){.bar .settled,.bar .missing{transition:width .35s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div>
+    <h1>Settlement control</h1>
+    <div class="sub">Payments Operations — what was taken from customers, and what actually reached merchants.</div>
+  </div>
+  <form class="filters" id="filters" autocomplete="off">
+    <div>
+      <label for="start">From</label>
+      <input type="date" id="start" value="2026-09-01" required>
+    </div>
+    <div>
+      <label for="end">To</label>
+      <input type="date" id="end" value="2026-09-07" required>
+    </div>
+    <div>
+      <label for="merchant">Merchant</label>
+      <input type="text" id="merchant" placeholder="All merchants" maxlength="32" size="14">
+    </div>
+    <div>
+      <label for="apikey">API key</label>
+      <input type="password" id="apikey" value="" placeholder="enter API key" size="16">
+    </div>
+    <button type="submit">Load</button>
+  </form>
+</header>
+
+<div id="error" class="state error hidden" role="alert"></div>
+
+<section>
+  <div class="panel flow">
+    <div class="headline">
+      <div class="amount gap" id="gapAmount">—</div>
+      <div class="caption" id="gapCaption">Loading settlement position…</div>
+    </div>
+    <div class="bar" aria-hidden="true">
+      <div class="settled" id="barSettled" style="width:0%"></div>
+      <div class="missing" id="barMissing" style="width:0%"></div>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--settled)"></span>Settled <b id="legendSettled">—</b></span>
+      <span><span class="swatch" style="background:#B8443E"></span>Not settled <b id="legendGap">—</b></span>
+      <span>Successful transaction value <b id="legendTotal">—</b></span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Headline KPIs</h2>
+  <div class="kpis" id="kpis"></div>
+</section>
+
+<section>
+  <h2>Where the gap sits</h2>
+  <div class="charts">
+    <div class="panel">
+      <h2>Daily transactions vs settlement</h2>
+      <div id="trendChart"><div class="state">Loading…</div></div>
+    </div>
+    <div class="panel">
+      <h2>Top 10 merchants by settlement gap</h2>
+      <div id="gapChart"><div class="state">Loading…</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Merchants breaching operations thresholds</h2>
+  <div class="panel">
+    <div id="exceptions"><div class="state">Loading…</div></div>
+    <div class="note">Breach rule: settlement rate below 95% or settlement SLA below 90% in the selected window. Sorted by the money at stake.</div>
+  </div>
+</section>
+
+<section>
+  <h2>Data quality signals from the last pipeline runs</h2>
+  <div class="panel">
+    <div id="dq"><div class="state">Loading…</div></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const API_BASE = window.API_BASE || "http://127.0.0.1:8000";
+const RATE_THRESHOLD = 95, SLA_THRESHOLD = 90;
+const el = id => document.getElementById(id);
+
+function inr(value){
+  const n = Number(value) || 0;
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return "₹" + (n/1e7).toFixed(2) + " Cr";
+  if (abs >= 1e5) return "₹" + (n/1e5).toFixed(2) + " L";
+  return "₹" + n.toLocaleString("en-IN", {maximumFractionDigits:0});
+}
+function pct(v){ return (Number(v)||0).toFixed(2) + "%"; }
+function count(v){ return (Number(v)||0).toLocaleString("en-IN"); }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+async function api(path, params){
+  const url = new URL(API_BASE + path);
+  Object.entries(params || {}).forEach(([k,v]) => { if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, v); });
+  const res = await fetch(url, {headers: {"X-API-Key": el("apikey").value.trim()}});
+  if (!res.ok){
+    let detail = res.statusText;
+    try { const body = await res.json(); detail = body.detail || body.error || detail; } catch (_) {}
+    throw new Error(res.status + " — " + (typeof detail === "string" ? detail : JSON.stringify(detail)));
+  }
+  return res.json();
+}
+
+function showError(message){
+  const box = el("error");
+  box.innerHTML = "<b>Could not load settlement data</b>" + esc(message) +
+    "<br>Check that the API is running on " + esc(API_BASE) + " and that the API key is correct.";
+  box.classList.remove("hidden");
+}
+
+function renderFlow(s){
+  const total = s.transaction_amount || 0;
+  const settled = s.settled_amount || 0;
+  const gap = s.settlement_gap || 0;
+  const settledPct = total ? (settled/total*100) : 0;
+  el("gapAmount").textContent = inr(gap);
+  el("gapCaption").textContent = gap > 0
+    ? `of successful payments has not reached merchants in this window. ${pct(s.settlement_rate)} of transaction value settled across ${count(s.transaction_count)} successful transactions; ${count(s.unsettled_count)} transactions have no settled record at all.`
+    : `Every successful payment in this window has been settled across ${count(s.transaction_count)} transactions.`;
+  el("barSettled").style.width = settledPct.toFixed(2) + "%";
+  el("barMissing").style.width = (100 - settledPct).toFixed(2) + "%";
+  el("legendSettled").textContent = inr(settled);
+  el("legendGap").textContent = inr(gap);
+  el("legendTotal").textContent = inr(total);
+}
+
+function renderKpis(s, exceptions){
+  const cards = [
+    {k:"Transaction volume", v:inr(s.transaction_amount), n:count(s.transaction_count) + " successful transactions", cls:""},
+    {k:"Settlement rate", v:pct(s.settlement_rate), n:"target ≥ " + RATE_THRESHOLD + "%", cls: s.settlement_rate < RATE_THRESHOLD ? "breach" : "good"},
+    {k:"Settlement gap", v:inr(s.settlement_gap), n:count(s.unsettled_count) + " transactions unsettled", cls: s.settlement_gap > 0 ? "breach" : "good"},
+    {k:"SLA rate (30 min)", v:pct(s.sla_rate), n:"target ≥ " + SLA_THRESHOLD + "%", cls: s.sla_rate < SLA_THRESHOLD ? "breach" : "good"},
+    {k:"Merchants at risk", v:count(exceptions.length), n:"rate < 95% or SLA < 90%", cls: exceptions.length ? "breach" : "good"}
+  ];
+  el("kpis").innerHTML = cards.map(c =>
+    `<div class="kpi ${c.cls}"><div class="k">${esc(c.k)}</div><div class="v">${esc(c.v)}</div><div class="n">${esc(c.n)}</div></div>`
+  ).join("");
+}
+
+function renderTrend(points){
+  const host = el("trendChart");
+  if (!points.length){ host.innerHTML = '<div class="state">No transactions in this window. Widen the dates or clear the merchant filter.</div>'; return; }
+  const W = 560, H = 260, padL = 58, padR = 10, padT = 12, padB = 42;
+  const max = Math.max(...points.map(p => Math.max(p.transaction_amount, p.settled_amount))) || 1;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const slot = innerW / points.length, bw = Math.min(20, slot/2.6);
+  const y = v => padT + innerH - (v/max)*innerH;
+  let gridlines = "", bars = "", labels = "";
+  for (let i = 0; i <= 4; i++){
+    const v = max*i/4, yy = y(v);
+    gridlines += `<line class="gridline" x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}"></line>`;
+    labels += `<text class="tick" x="${padL-8}" y="${yy+4}" text-anchor="end">${esc(inr(v))}</text>`;
+  }
+  points.forEach((p, i) => {
+    const cx = padL + slot*i + slot/2;
+    bars += `<rect class="bar-txn" x="${cx-bw-1}" y="${y(p.transaction_amount)}" width="${bw}" height="${padT+innerH-y(p.transaction_amount)}"><title>${esc(p.transaction_date)} transactions ${esc(inr(p.transaction_amount))}</title></rect>`;
+    bars += `<rect class="bar-stl" x="${cx+1}" y="${y(p.settled_amount)}" width="${bw}" height="${padT+innerH-y(p.settled_amount)}"><title>${esc(p.transaction_date)} settled ${esc(inr(p.settled_amount))} (${esc(pct(p.settlement_rate))})</title></rect>`;
+    labels += `<text class="tick" x="${cx}" y="${H-padB+16}" text-anchor="middle">${esc(p.transaction_date.slice(5))}</text>`;
+  });
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily transaction value against settled value">
+    ${gridlines}<line class="axis" x1="${padL}" y1="${padT+innerH}" x2="${W-padR}" y2="${padT+innerH}"></line>${bars}${labels}
+  </svg>
+  <div class="legend" style="margin-top:8px"><span><span class="swatch" style="background:#9FB4C2"></span>Successful transactions</span><span><span class="swatch" style="background:var(--settled)"></span>Settled</span></div>`;
+}
+
+function renderGapChart(rows){
+  const host = el("gapChart");
+  if (!rows.length){ host.innerHTML = '<div class="state">No settlement gap in this window.</div>'; return; }
+  const W = 560, rowH = 24, padL = 116, padR = 74, padT = 6;
+  const H = padT + rows.length*rowH + 6;
+  const max = Math.max(...rows.map(r => r.settlement_gap)) || 1;
+  const innerW = W - padL - padR;
+  const body = rows.map((r, i) => {
+    const y = padT + i*rowH, w = Math.max(2, (r.settlement_gap/max)*innerW);
+    return `<text class="tick" x="${padL-8}" y="${y+15}" text-anchor="end">${esc(r.merchant_id)} · ${esc(r.risk_level.slice(0,1))}</text>
+      <rect class="bar-gapm" x="${padL}" y="${y+4}" width="${w}" height="${rowH-10}"><title>${esc(r.merchant_name)} — ${esc(inr(r.settlement_gap))}, settlement rate ${esc(pct(r.settlement_rate))}</title></rect>
+      <text class="tick" x="${padL+w+6}" y="${y+15}">${esc(inr(r.settlement_gap))}</text>`;
+  }).join("");
+  host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Top merchants by settlement gap">${body}</svg>`;
+}
+
+function renderExceptions(rows){
+  const host = el("exceptions");
+  if (!rows.length){ host.innerHTML = '<div class="state">No merchant breached the thresholds in this window.</div>'; return; }
+  const max = Math.max(...rows.map(r => r.settlement_gap)) || 1;
+  host.innerHTML = `<table>
+    <thead><tr><th>Merchant</th><th>Risk at period end</th><th class="num">Settlement rate</th><th class="num">SLA rate</th><th class="num">Unsettled</th><th class="num">Settlement gap</th></tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td><span class="mid">${esc(r.merchant_id)}</span> · ${esc(r.merchant_name)}</td>
+      <td><span class="risk ${esc(r.risk_level)}">${esc(r.risk_level)}</span></td>
+      <td class="num ${r.settlement_rate < RATE_THRESHOLD ? "breachval" : ""}">${esc(pct(r.settlement_rate))}</td>
+      <td class="num ${r.sla_rate < SLA_THRESHOLD ? "breachval" : ""}">${esc(pct(r.sla_rate))}</td>
+      <td class="num">${esc(count(r.unsettled_count))}</td>
+      <td class="num">${esc(inr(r.settlement_gap))}<span class="minibar" style="width:${(r.settlement_gap/max*60).toFixed(1)}px"></span></td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+function renderDq(rows){
+  const host = el("dq");
+  if (!rows.length){ host.innerHTML = '<div class="state">No data quality findings recorded.</div>'; return; }
+  host.innerHTML = `<table>
+    <thead><tr><th>Rule</th><th>Source</th><th>Handling</th><th class="num">Records</th><th>What it means</th></tr></thead>
+    <tbody>${rows.map(r => `<tr>
+      <td class="mid">${esc(r.rule_id)}</td>
+      <td>${esc(r.source_table)}</td>
+      <td>${esc(r.disposition)}</td>
+      <td class="num">${esc(count(r.failed_rows))}</td>
+      <td>${esc(r.reason)}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+async function load(event){
+  if (event) event.preventDefault();
+  el("error").classList.add("hidden");
+  const params = {start_date: el("start").value, end_date: el("end").value};
+  const merchant = el("merchant").value.trim();
+  const scoped = merchant ? {...params, merchant_id: merchant} : params;
+  try {
+    const [summary, exceptions, trend, gaps, dq] = await Promise.all([
+      api("/api/v1/settlement-summary", scoped),
+      api("/api/v1/merchant-exceptions", params),
+      api("/api/v1/daily-trend", scoped),
+      api("/api/v1/top-merchant-gaps", {...params, limit: 10}),
+      api("/api/v1/data-quality", {limit: 12})
+    ]);
+    renderFlow(summary);
+    renderKpis(summary, exceptions);
+    renderTrend(trend);
+    renderGapChart(gaps);
+    renderExceptions(exceptions);
+    renderDq(dq);
+  } catch (err){
+    showError(err.message);
+  }
+}
+
+el("filters").addEventListener("submit", load);
+load();
+</script>
+</body>
+</html>

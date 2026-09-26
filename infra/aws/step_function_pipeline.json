@@ -1,0 +1,84 @@
+{
+  "Comment": "Incremental settlement pipeline: land, validate, model, publish KPIs",
+  "StartAt": "IngestToBronze",
+  "States": {
+    "IngestToBronze": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "Cluster": "${EtlCluster}",
+        "TaskDefinition": "${EtlTaskDefinition}",
+        "LaunchType": "FARGATE",
+        "Overrides": {
+          "ContainerOverrides": [
+            {"Name": "etl", "Command": ["python", "-m", "src.pipeline.run_pipeline", "--stage", "bronze"]}
+          ]
+        }
+      },
+      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 30, "MaxAttempts": 2, "BackoffRate": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "NotifyFailure"}],
+      "Next": "TransformSilverAndGold"
+    },
+    "TransformSilverAndGold": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "Cluster": "${EtlCluster}",
+        "TaskDefinition": "${EtlTaskDefinition}",
+        "LaunchType": "FARGATE",
+        "Overrides": {
+          "ContainerOverrides": [
+            {"Name": "etl", "Command": ["python", "-m", "src.pipeline.run_pipeline"]}
+          ]
+        }
+      },
+      "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "NotifyFailure"}],
+      "Next": "DataQualityGate"
+    },
+    "DataQualityGate": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "Cluster": "${EtlCluster}",
+        "TaskDefinition": "${EtlTaskDefinition}",
+        "LaunchType": "FARGATE",
+        "Overrides": {
+          "ContainerOverrides": [
+            {"Name": "etl", "Command": ["python", "-m", "scripts.dq_gate", "--max-critical", "0", "--max-quarantine-pct", "2.0"]}
+          ]
+        }
+      },
+      "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "QuarantineAlert"}],
+      "Next": "PublishKpiMetrics"
+    },
+    "PublishKpiMetrics": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${PublishMetricsFunction}",
+        "Payload": {"namespace": "Settlement/KPI"}
+      },
+      "End": true
+    },
+    "QuarantineAlert": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${AlertsTopic}",
+        "Subject": "Settlement data quality gate failed",
+        "Message.$": "$"
+      },
+      "Next": "NotifyFailure"
+    },
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${AlertsTopic}",
+        "Subject": "Settlement pipeline failed",
+        "Message.$": "$"
+      },
+      "End": true
+    }
+  }
+}
