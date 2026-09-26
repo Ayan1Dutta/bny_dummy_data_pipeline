@@ -8,6 +8,10 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '10'))
     }
 
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
     parameters {
         booleanParam(name: 'PUBLISH', defaultValue: false, description: 'Push the image to the registry (only when GitLab CI is unavailable)')
     }
@@ -94,6 +98,44 @@ pipeline {
                       --severity HIGH,CRITICAL "$IMAGE_REPO:$IMAGE_TAG"
                     trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed "$IMAGE_REPO:$IMAGE_TAG"
                 '''
+            }
+        }
+
+        stage('Smoke Test') {
+            environment {
+                SMOKE_NET = "smoke-${env.BUILD_TAG}"
+                SMOKE_CT  = "smoke-api-${env.BUILD_TAG}"
+            }
+            steps {
+                sh '''
+                    . "$VENV/bin/activate"
+                    SMOKE_API_KEY=$(python -c "import secrets; print(secrets.token_hex(16))")
+                    docker network create "$SMOKE_NET"
+                    docker create --name "$SMOKE_CT" --network "$SMOKE_NET" --network-alias smoke-api \
+                      -e APP_ENV=dev -e API_KEY="$SMOKE_API_KEY" "$IMAGE_REPO:$IMAGE_TAG"
+                    docker cp data/warehouse/settlement.duckdb "$SMOKE_CT":/app/data/warehouse/settlement.duckdb
+                    docker start "$SMOKE_CT"
+                    docker network connect "$SMOKE_NET" "$(hostname)"
+                    for i in $(seq 1 30); do
+                      curl -fs http://smoke-api:8000/health && break
+                      sleep 2
+                    done
+                    python -m scripts.smoke_test --base-url http://smoke-api:8000 --api-key "$SMOKE_API_KEY" \
+                      --out evidence/08_smoke_test_results/jenkins_smoke.json
+                    python -m scripts.reconciliation_gate --api-url http://smoke-api:8000 --api-key "$SMOKE_API_KEY" \
+                      --out evidence/09_kpi_reconciliation/jenkins_api.json
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        mkdir -p evidence/08_smoke_test_results
+                        docker logs "$SMOKE_CT" > evidence/08_smoke_test_results/jenkins_container.log 2>&1 || true
+                        docker network disconnect "$SMOKE_NET" "$(hostname)" || true
+                        docker rm -f "$SMOKE_CT" || true
+                        docker network rm "$SMOKE_NET" || true
+                    '''
+                }
             }
         }
 
