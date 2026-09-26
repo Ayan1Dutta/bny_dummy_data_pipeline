@@ -94,9 +94,12 @@ pipeline {
         stage('Container Scan') {
             steps {
                 sh '''
-                    trivy image --format json --output evidence/02_security_results/container.json \
+                    export TRIVY_CACHE_DIR=/var/jenkins_home/.cache/trivy
+                    export TRIVY_DB_REPOSITORY=mirror.gcr.io/aquasec/trivy-db:2,ghcr.io/aquasecurity/trivy-db:2
+                    trivy image --download-db-only --timeout 30m
+                    trivy image --skip-db-update --timeout 15m --format json --output evidence/02_security_results/container.json \
                       --severity HIGH,CRITICAL "$IMAGE_REPO:$IMAGE_TAG"
-                    trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed "$IMAGE_REPO:$IMAGE_TAG"
+                    trivy image --skip-db-update --timeout 15m --exit-code 1 --severity CRITICAL --ignore-unfixed "$IMAGE_REPO:$IMAGE_TAG"
                 '''
             }
         }
